@@ -198,6 +198,7 @@ const OTP_HTML = `
   console.log(e);
   return res.status(500).json({ error: "Failed" });
 }
+});
 
 // ---------------- VERIFY OTP ----------------
 app.post("/verify-otp", (req, res) => {
