@@ -61,6 +61,65 @@ const mailjet = Mailjet.apiConnect(
 // ---------------- RESEND ----------------
 const resend = new Resend(process.env.RESEND_API_KEY);
 
+async function sendWithFallback(email, subject, html) {
+  // 1️⃣ BREVO FIRST (300/day)
+  try {
+    const r = await brevoApi.sendTransacEmail({
+      sender: { email: "shop@aurawardrobe.in", name: "Aura Wardrobe" },
+      to: [{ email }],
+      subject,
+      htmlContent: html
+    });
+
+    if (r?.messageId) {
+      console.log("✅ Sent via BREVO");
+      return;
+    }
+    throw new Error("Brevo limit or failed");
+  } catch (e) {
+    console.log("❌ Brevo failed:", e.message);
+  }
+
+  // 2️⃣ MAILJET SECOND (200/day)
+  try {
+    const r = await mailjet.post("send", { version: "v3.1" }).request({
+      Messages: [{
+        From: { Email: "shop@aurawardrobe.in", Name: "Aura Wardrobe" },
+        To: [{ Email: email }],
+        Subject: subject,
+        HTMLPart: html
+      }]
+    });
+
+    if (r?.body?.Messages?.[0]?.Status === "success") {
+      console.log("✅ Sent via MAILJET");
+      return;
+    }
+    throw new Error("Mailjet limit or failed");
+  } catch (e) {
+    console.log("❌ Mailjet failed:", e.message);
+  }
+
+  // 3️⃣ RESEND LAST (100/day)
+  try {
+    const r = await resend.emails.send({
+      from: "Aura Wardrobe <shop@aurawardrobe.in>",
+      to: email,
+      subject,
+      html
+    });
+
+    if (!r.error) {
+      console.log("✅ Sent via RESEND");
+      return;
+    }
+    throw new Error("Resend failed");
+  } catch (e) {
+    console.log("❌ Resend failed:", e.message);
+    throw new Error("Failed, Please try other Option");
+  }
+}
+
 // ---------------- SEND OTP ----------------
 app.post("/send-otp", async (req, res) => {
 
@@ -72,12 +131,16 @@ app.post("/send-otp", async (req, res) => {
 
   const otp = Math.floor(100000 + Math.random() * 900000);
 
+const LOGO =
+  "https://blogger.googleusercontent.com/img/b/R29vZ2xl/AVvXsEh47PcgkehRJ-Pau_mIDS_t69NsAUxe1Y_ek4LDSi49iccFbUlTbfQxFszCmCXxk1aQxpEL6tIAHlV9-SIoHY0o-zLTF1_9J38u0A1kmPvyPLelLZkDg1P4-ChVjxZxnrPhMX3HOIgu90VzCOA02vmN6FO5UqByOK__aK73TSabnEtlk59tvdKflkJkBx0/s500/1000008258-removebg-preview.png";
+
 const OTP_HTML = `
 <div style="margin:0;padding:0;background:#f5f5f5;font-family:Arial,sans-serif;">
   <div style="max-width:520px;margin:40px auto;background:#ffffff;border-radius:16px;overflow:hidden;box-shadow:0 4px 18px rgba(0,0,0,0.08);">
 
     <!-- HEADER -->
-    <div style="background:#ff3b30;padding:22px;text-align:center;">
+    <div style="background:#000000;padding:22px;text-align:center;">
+      <img src="${LOGO}" width="64" height="64" style="border-radius:50%;background:#fff;padding:6px;margin-bottom:10px;" />
       <h1 style="margin:0;color:#fff;font-size:24px;letter-spacing:1px;">
         Aura Wardrobe
       </h1>
@@ -85,16 +148,12 @@ const OTP_HTML = `
 
     <!-- BODY -->
     <div style="padding:32px 24px;color:#222;">
-
-      <h2 style="margin-top:0;font-size:22px;">
-        Verification Code
-      </h2>
+      <h2 style="margin-top:0;font-size:22px;">Verification Code</h2>
 
       <p style="font-size:15px;line-height:1.7;color:#555;">
         Use the following One-Time Password (OTP) to continue your verification process.
       </p>
 
-      <!-- OTP BOX -->
       <div style="
         margin:28px 0;
         text-align:center;
@@ -103,36 +162,18 @@ const OTP_HTML = `
         border-radius:14px;
         padding:20px;
       ">
-        <div style="
-          font-size:34px;
-          font-weight:700;
-          letter-spacing:8px;
-          color:#ff3b30;
-        ">
+        <div style="font-size:34px;font-weight:700;letter-spacing:8px;color:#ff3b30;">
           ${otp}
         </div>
       </div>
 
       <p style="font-size:14px;color:#666;line-height:1.7;">
-        This OTP is valid for <strong>5 minutes</strong>.
-        Please do not share this code with anyone for security reasons.
+        This OTP is valid for <strong>5 minutes</strong>. Do not share it with anyone.
       </p>
-
-      <p style="font-size:14px;color:#666;line-height:1.7;">
-        If you did not request this verification, you can safely ignore this email.
-      </p>
-
     </div>
 
     <!-- FOOTER -->
-    <div style="
-      background:#fafafa;
-      padding:18px;
-      text-align:center;
-      font-size:12px;
-      color:#999;
-      border-top:1px solid #eee;
-    ">
+    <div style="background:#fafafa;padding:18px;text-align:center;font-size:12px;color:#999;border-top:1px solid #eee;">
       © 2026 Aura Wardrobe. All rights reserved.
     </div>
 
@@ -146,60 +187,17 @@ const OTP_HTML = `
   };
 
   try {
+  await sendWithFallback(
+    email,
+    "Aura Wardrobe Verification OTP",
+    OTP_HTML
+  );
 
-    // 👉 COD → BREVO
-if (type === "cod") {
-  const response = await brevoApi.sendTransacEmail({
-    sender: { email: "shop@aurawardrobe.in", name: "Aura Wardrobe" },
-    to: [{ email }],
-    subject: "Aura Wardrobe Verification OTP",
-    htmlContent: OTP_HTML
-  });
-
-  console.log("BREVO RESPONSE:", response);
-
-  if (!response || !response.messageId) {
-    throw new Error("Failed, Please try again");
-  }
+  return res.json({ success: true });
+} catch (e) {
+  console.log(e);
+  return res.status(500).json({ error: "Failed" });
 }
-    // 👉 SIGNUP → MAILJET
-    else if (type === "signup") {
-  const response = await mailjet.post("send", { version: "v3.1" }).request({
-    Messages: [{
-      From: { Email: "shop@aurawardrobe.in", Name: "Aura Wardrobe" },
-      To: [{ Email: email }],
-      Subject: "Aura Wardrobe Verification OTP",
-      HTMLPart: OTP_HTML
-    }]
-  });
-
-  if (!response?.body?.Messages?.[0]?.Status || response.body.Messages[0].Status !== "success") {
-  throw new Error("Failed, Please try again");
-}
-}
-
-    // 👉 RESET → RESEND
-    else if (type === "reset") {
-
-  const response = await resend.emails.send({
-    from: "Aura Wardrobe <shop@aurawardrobe.in>",
-    to: email,
-    subject: "Aura Wardrobe Verification OTP",
-    html: OTP_HTML
-  });
-
-  if (!response || response.error) {
-    throw new Error("Failed, Please try again");
-  }
-}
-
-    return res.json({ success: true });
-
-  } catch (e) {
-    console.log(e);
-    return res.status(500).json({ error: "Failed" });
-  }
-});
 
 // ---------------- VERIFY OTP ----------------
 app.post("/verify-otp", (req, res) => {
