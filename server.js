@@ -138,7 +138,6 @@ const OTP_HTML = `
 
   </div>
 </div>
-```
 `;
 
   otpStore[email] = {
