@@ -72,6 +72,75 @@ app.post("/send-otp", async (req, res) => {
 
   const otp = Math.floor(100000 + Math.random() * 900000);
 
+const OTP_HTML = `
+<div style="margin:0;padding:0;background:#f5f5f5;font-family:Arial,sans-serif;">
+  <div style="max-width:520px;margin:40px auto;background:#ffffff;border-radius:16px;overflow:hidden;box-shadow:0 4px 18px rgba(0,0,0,0.08);">
+
+    <!-- HEADER -->
+    <div style="background:#ff3b30;padding:22px;text-align:center;">
+      <h1 style="margin:0;color:#fff;font-size:24px;letter-spacing:1px;">
+        Aura Wardrobe
+      </h1>
+    </div>
+
+    <!-- BODY -->
+    <div style="padding:32px 24px;color:#222;">
+
+      <h2 style="margin-top:0;font-size:22px;">
+        Verification Code
+      </h2>
+
+      <p style="font-size:15px;line-height:1.7;color:#555;">
+        Use the following One-Time Password (OTP) to continue your verification process.
+      </p>
+
+      <!-- OTP BOX -->
+      <div style="
+        margin:28px 0;
+        text-align:center;
+        background:#f8f8f8;
+        border:2px dashed #ff3b30;
+        border-radius:14px;
+        padding:20px;
+      ">
+        <div style="
+          font-size:34px;
+          font-weight:700;
+          letter-spacing:8px;
+          color:#ff3b30;
+        ">
+          ${otp}
+        </div>
+      </div>
+
+      <p style="font-size:14px;color:#666;line-height:1.7;">
+        This OTP is valid for <strong>5 minutes</strong>.
+        Please do not share this code with anyone for security reasons.
+      </p>
+
+      <p style="font-size:14px;color:#666;line-height:1.7;">
+        If you did not request this verification, you can safely ignore this email.
+      </p>
+
+    </div>
+
+    <!-- FOOTER -->
+    <div style="
+      background:#fafafa;
+      padding:18px;
+      text-align:center;
+      font-size:12px;
+      color:#999;
+      border-top:1px solid #eee;
+    ">
+      © 2026 Aura Wardrobe. All rights reserved.
+    </div>
+
+  </div>
+</div>
+```
+`;
+
   otpStore[email] = {
     otp,
     expires: Date.now() + 5 * 60 * 1000
@@ -84,8 +153,8 @@ if (type === "cod") {
   const response = await brevoApi.sendTransacEmail({
     sender: { email: "shop@aurawardrobe.in", name: "Aura Wardrobe" },
     to: [{ email }],
-    subject: "COD Verification OTP",
-    htmlContent: `<h2>Your OTP is ${otp}</h2>`
+    subject: "Aura Wardrobe Verification OTP",
+    htmlContent: OTP_HTML
   });
 
   console.log("BREVO RESPONSE:", response);
@@ -100,8 +169,8 @@ if (type === "cod") {
     Messages: [{
       From: { Email: "shop@aurawardrobe.in", Name: "Aura Wardrobe" },
       To: [{ Email: email }],
-      Subject: "Signup OTP",
-      HTMLPart: `<h2>Your OTP is ${otp}</h2>`
+      Subject: "Aura Wardrobe Verification OTP",
+      HTMLPart: OTP_HTML
     }]
   });
 
@@ -112,16 +181,17 @@ if (type === "cod") {
 
     // 👉 RESET → RESEND
     else if (type === "reset") {
+
   const response = await resend.emails.send({
-    from: "shop@aurawardrobe.in",
+    from: "Aura Wardrobe <shop@aurawardrobe.in>",
     to: email,
-    subject: "Reset Password OTP",
-    html: `<h2>Your OTP is ${otp}</h2>`
+    subject: "Aura Wardrobe Verification OTP",
+    html: OTP_HTML
   });
 
   if (!response || response.error) {
-  throw new Error("Failed, Please try again");
-}
+    throw new Error("Failed, Please try again");
+  }
 }
 
     return res.json({ success: true });
