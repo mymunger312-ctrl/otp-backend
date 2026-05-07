@@ -14,6 +14,14 @@ import { Resend } from "resend";
 
 dotenv.config();
 
+process.on("uncaughtException", (err) => {
+  console.error("❌ UNCAUGHT EXCEPTION:", err);
+});
+
+process.on("unhandledRejection", (err) => {
+  console.error("❌ UNHANDLED REJECTION:", err);
+});
+
 const app = express();
 app.set("trust proxy", 1);
 app.use(express.json());
@@ -74,39 +82,46 @@ app.post("/send-otp", async (req, res) => {
     // 👉 COD → BREVO
 if (type === "cod") {
   const response = await brevoApi.sendTransacEmail({
-    sender: { email: "no-reply@yourdomain.com", name: "Aura Wardrobe" },
+    sender: { email: "shop@aurawardrobe.in", name: "Aura Wardrobe" },
     to: [{ email }],
     subject: "COD Verification OTP",
     htmlContent: `<h2>Your OTP is ${otp}</h2>`
   });
 
   console.log("BREVO RESPONSE:", response);
-}
 
+  if (!response || !response.messageId) {
+    throw new Error("Failed, Please try again");
+  }
+}
     // 👉 SIGNUP → MAILJET
     else if (type === "signup") {
   const response = await mailjet.post("send", { version: "v3.1" }).request({
     Messages: [{
-      From: { Email: "no-reply@yourdomain.com", Name: "Aura Wardrobe" },
+      From: { Email: "shop@aurawardrobe.in", Name: "Aura Wardrobe" },
       To: [{ Email: email }],
       Subject: "Signup OTP",
       HTMLPart: `<h2>Your OTP is ${otp}</h2>`
     }]
   });
 
-  console.log("MAILJET RESPONSE:", response.body);
+  if (!response?.body?.Messages?.[0]?.Status || response.body.Messages[0].Status !== "success") {
+  throw new Error("Failed, Please try again");
+}
 }
 
     // 👉 RESET → RESEND
     else if (type === "reset") {
   const response = await resend.emails.send({
-    from: "no-reply@yourdomain.com",
+    from: "shop@aurawardrobe.in",
     to: email,
     subject: "Reset Password OTP",
     html: `<h2>Your OTP is ${otp}</h2>`
   });
 
-  console.log("RESEND RESPONSE:", response);
+  if (!response || response.error) {
+  throw new Error("Failed, Please try again");
+}
 }
 
     return res.json({ success: true });
@@ -141,4 +156,8 @@ app.post("/verify-otp", (req, res) => {
   return res.json({ success: true });
 });
 
-app.listen(process.env.PORT || 3000);
+const PORT = process.env.PORT || 3000;
+
+app.listen(PORT, "0.0.0.0", () => {
+  console.log("🚀 OTP server running on port:", PORT);
+});
