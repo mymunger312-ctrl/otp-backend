@@ -72,36 +72,42 @@ app.post("/send-otp", async (req, res) => {
   try {
 
     // 👉 COD → BREVO
-    if (type === "cod") {
-      await brevoApi.sendTransacEmail({
-        sender: { email: "no-reply@yourdomain.com" },
-        to: [{ email }],
-        subject: "COD Verification OTP",
-        htmlContent: `<h2>Your OTP is ${otp}</h2>`
-      });
-    }
+if (type === "cod") {
+  const response = await brevoApi.sendTransacEmail({
+    sender: { email: "no-reply@yourdomain.com", name: "Aura Wardrobe" },
+    to: [{ email }],
+    subject: "COD Verification OTP",
+    htmlContent: `<h2>Your OTP is ${otp}</h2>`
+  });
+
+  console.log("BREVO RESPONSE:", response);
+}
 
     // 👉 SIGNUP → MAILJET
     else if (type === "signup") {
-      await mailjet.post("send", { version: "v3.1" }).request({
-        Messages: [{
-          From: { Email: "no-reply@yourdomain.com" },
-          To: [{ Email: email }],
-          Subject: "Signup OTP",
-          HTMLPart: `<h2>Your OTP is ${otp}</h2>`
-        }]
-      });
-    }
+  const response = await mailjet.post("send", { version: "v3.1" }).request({
+    Messages: [{
+      From: { Email: "no-reply@yourdomain.com", Name: "Aura Wardrobe" },
+      To: [{ Email: email }],
+      Subject: "Signup OTP",
+      HTMLPart: `<h2>Your OTP is ${otp}</h2>`
+    }]
+  });
+
+  console.log("MAILJET RESPONSE:", response.body);
+}
 
     // 👉 RESET → RESEND
     else if (type === "reset") {
-      await resend.emails.send({
-        from: "no-reply@yourdomain.com",
-        to: email,
-        subject: "Reset Password OTP",
-        html: `<h2>Your OTP is ${otp}</h2>`
-      });
-    }
+  const response = await resend.emails.send({
+    from: "no-reply@yourdomain.com",
+    to: email,
+    subject: "Reset Password OTP",
+    html: `<h2>Your OTP is ${otp}</h2>`
+  });
+
+  console.log("RESEND RESPONSE:", response);
+}
 
     return res.json({ success: true });
 
